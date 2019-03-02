@@ -1,7 +1,7 @@
 <template>
   <main class="drum-machine">
     <form action>
-      <h2 class="vh" id="dm-main-heading">Drum Machine Main Controls</h2>
+      <h2 class="vh" id="dm-main-heading">Midi Sequencer Main Controls</h2>
       <div class="bpm-and-play" aria-labelledby="dm-main-heading">
         <div class="bpm">
           <div class="bpm-slider">
@@ -99,12 +99,6 @@
             Polymetric pattern length: {{meta.compoundLength / 4}} beats ({{meta.compoundLength}} &#x00bc;-beats)
             <button @click.prevent="reset" class="reset" :disabled="meta.isPlaying">Reset</button>
           </p>
-          <div class="link-section">
-            <div v-if="meta.linkUrl">
-              <label for="linkField">Link to your drum pattern:</label>
-              <input id="linkField" :value="meta.linkUrl" type="text" onfocus="this.select()" @focus="link" />
-            </div>
-          </div>
         </aside>
       </div>
     </form>
@@ -117,12 +111,12 @@ import MuteIcon from './MuteIcon.vue';
 import AddIcon from './AddIcon.vue';
 import RemoveIcon from './RemoveIcon.vue';
 import SettingsIcon from './SettingsIcon.vue';
-
+import WebMidi from '../../../node_modules/webmidi/webmidi.min';
 
 var defaultState = {
   sounds: [
     {
-      name: 'kick',
+      name: 'littleBits Synth Kit',
       url: 'sounds/kick.mp3',
       buffer: null,
       length: 8,
@@ -136,11 +130,11 @@ var defaultState = {
       fluctuationLevel: 0,
       overrides: [],
       volume: 100,
-      muted: false,
+      muted: true,
       expanded: false
     },
     {
-      name: 'snare',
+      name: 'Synth 2',
       url: 'sounds/snare.mp3',
       buffer: null,
       length: 8,
@@ -154,11 +148,11 @@ var defaultState = {
       fluctuationLevel: 40,
       overrides: ['kick', 'snare light'],
       volume: 100,
-      muted: false,
+      muted: true,
       expanded: false
     },
     {
-      name: 'snare light',
+      name: 'Synth 3',
       url: 'sounds/snare_light.mp3',
       buffer: null,
       length: 8,
@@ -172,7 +166,7 @@ var defaultState = {
       fluctuationLevel: 60,
       overrides: ['kick'],
       volume: 100,
-      muted: false,
+      muted: true,
       expanded: false
     },
     {
@@ -190,7 +184,7 @@ var defaultState = {
       fluctuationLevel: 60,
       overrides: [],
       volume: 80,
-      muted: false,
+      muted: true,
       expanded: false
     },
     {
@@ -212,7 +206,7 @@ var defaultState = {
       expanded: false
     },
     {
-      name: 'crash',
+      name: 'bass',
       url: 'sounds/crash.mp3',
       buffer: null,
       length: 8,
@@ -231,7 +225,7 @@ var defaultState = {
     }
   ],
   meta: {
-    bpm: 120,
+    bpm: 60,
     beatsLength: 8,
     futureTickTime: 0.0,
     isPlaying: false,
@@ -268,13 +262,22 @@ var parseQuery = function(query) {
   }
 };
 
+window.webtime = function(){
+  return window.wm.time/1000
+};
+
+window.log = function(msg){
+  // comment out to turn off logging
+  // console.log(msg)
+}
+
 export default {
   data() {
     return {
       audioContext: null,
       sounds: null,
       meta: {
-        bpm: 120,
+        bpm: 60,
         isPlaying: false
       }
     }
@@ -288,15 +291,32 @@ export default {
   },
   methods: {
     audioContextCheck() {
-      if (typeof AudioContext !== 'undefined') {
-        return new AudioContext();
-      } else if (typeof webkitAudioContext !== 'undefined') {
-        return new webkitAudioContext();
-      } else if (typeof mozAudioContext !== 'undefined') {
-        return new mozAudioContext();
-      } else {
-        throw new Error('AudioContext not supported');
-      }
+      WebMidi.enable(function (err) {
+
+        if (err) {
+          window.log("WebMidi could not be enabled.", err);
+        } else {
+          window.log("WebMidi enabled!");
+          window.log(WebMidi.inputs);
+          console.log(WebMidi.outputs);
+        }
+
+      });
+
+      // if (typeof AudioContext !== 'undefined') {
+      //   return new AudioContext();
+      // } else if (typeof webkitAudioContext !== 'undefined') {
+      //   return new webkitAudioContext();
+      // } else if (typeof mozAudioContext !== 'undefined') {
+      //   return new mozAudioContext();
+      // } else {
+      //   throw new Error('AudioContext not supported');
+      // }
+
+      window.wm = WebMidi
+      var ac = new AudioContext()
+      window.ac = ac
+      return ac
     },
     soundLoader(path) {
       var soundObject = {};
@@ -357,7 +377,7 @@ export default {
         this.meta = JSON.parse(JSON.stringify(defaultState.meta));
       }
 
-      var queryState = parseQuery(window.location.search);
+      var queryState = null //parseQuery(window.location.search);
       if (queryState) {
         var params = Object.keys(queryState);
         var state = {
@@ -378,9 +398,10 @@ export default {
 
     },
     futureTick() {
+      window.log(`futureTick this.meta.futureTickTime ${this.meta.futureTickTime}`)
       var noteLength = 60 / this.meta.bpm;
       this.meta.futureTickTime += 0.25 * noteLength;
-
+      window.log(`futureTick this.meta.futureTickTime ${this.meta.futureTickTime}`)
       this.sounds.forEach((sound) => {
         sound.current++;
         if (sound.current > sound.length) {
@@ -389,6 +410,7 @@ export default {
       });
     },
     scheduleNote() {
+      window.log('scheduleNote')
       this.sounds.forEach((sound) => {
         sound.probable = this.probability(sound.probability);
       });
@@ -400,6 +422,28 @@ export default {
       if (!currentIsActive) {
         return;
       }
+
+      window.log(WebMidi)
+      var out1 = WebMidi.getOutputByName("littleBits KORG W5 MIDI OUT");
+      var out2 = WebMidi.getOutputByName("Komplete Audio 6");
+      var out3 = WebMidi.getOutputByName("IAC Driver Bus 1");
+      window.log(out1, out2, out3)
+      if(sound.name == 'littleBits Synth Kit' && !sound.muted){
+        window.log(sound)
+        out1.playNote("E4", 1, {duration: 100, velocity: 0.5});
+      }
+
+      if(sound.name == 'Synth 2' && !sound.muted){
+        window.log(sound)
+        out2.playNote("E2", 1, {duration: 500, velocity: 0.5});
+      }
+
+      if(sound.name == 'Synth 3' && !sound.muted){
+        window.log(sound)
+        out3.playNote(_.sample(["E3", "G3", "A3", "B3", "B2", "E4"]), 1, {duration: 100, velocity: 0.5});
+      }
+      // ignore mutes and all, just don't play sounds!
+      return
 
       if (sound.muted) {
         return;
@@ -439,9 +483,12 @@ export default {
 
     },
     scheduler() {
-      while (this.meta.futureTickTime < this.audioContext.currentTime + 0.1) {
+      window.log(`this.meta.futureTickTime ${this.meta.futureTickTime} this.audioContext.currentTime ${this.audioContext.currentTime} webtime ${window.webtime()}`)
+      // while (this.meta.futureTickTime < this.audioContext.currentTime + 0.1) {
+      while (this.meta.futureTickTime < window.webtime() + 0.1) {
         this.scheduleNote();
         this.futureTick();
+        window.log('sleeping')
       }
       window.t = window.setTimeout(this.scheduler, 50.0);
     },
@@ -527,19 +574,22 @@ export default {
       }
     },
     play() {
+      window.log(`play this.meta.isPlaying ${this.meta.isPlaying}`)
       this.meta.isPlaying = !this.meta.isPlaying;
       if (this.meta.isPlaying) {
         this.sounds.forEach((sound) => {
           sound.current = 1;
         });
 
-        this.meta.futureTickTime = this.audioContext.currentTime;
+        this.meta.futureTickTime = window.webtime()
+        // this.meta.futureTickTime = this.audioContext.currentTime;
         this.scheduler();
       } else {
         window.clearTimeout(window.t);
         this.saveData();
         this.link();
       }
+      window.log(`play this.meta.isPlaying ${this.meta.isPlaying} this.meta.futureTickTime ${this.meta.futureTickTime}`)
     },
     lengthInfo() {
       var lengths = [];
@@ -592,6 +642,7 @@ export default {
       this.meta.detuneSupport = false;
     }
     this.loadSounds();
+    window.ss = this.sounds
     window.requestAnimFrame = (() => {
       return  window.requestAnimationFrame ||
               window.webkitRequestAnimationFrame ||
