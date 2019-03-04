@@ -113,15 +113,28 @@ import RemoveIcon from './RemoveIcon.vue';
 import SettingsIcon from './SettingsIcon.vue';
 import WebMidi from '../../../node_modules/webmidi/webmidi.min';
 
+
+const LB = 'littleBits Synth Kit'
+const SS = 'Soft Synth (Ableton Live)'
+const SB = 'Synth Bass (Ableton Live)'
+const SC = 'Synth Chord (Ableton Live)'
+const S1 = 'Drums (Ableton Live)'
+const S2 = 'Perc (Ableton Live)'
+
+const SLEEP_TIMEOUT = 50
+
+let noteIndex = 0
+let drumIndex = 0
+
 var defaultState = {
   sounds: [
     {
-      name: 'littleBits Synth Kit',
+      name: LB,
       url: 'sounds/kick.mp3',
       buffer: null,
       length: 8,
       current: 1,
-      active: [1],
+      active: [1,3,5,7],
       probability: {
         chance: 1,
         in: 1
@@ -134,7 +147,7 @@ var defaultState = {
       expanded: false
     },
     {
-      name: 'Synth 2',
+      name: SS,
       url: 'sounds/snare.mp3',
       buffer: null,
       length: 8,
@@ -152,12 +165,12 @@ var defaultState = {
       expanded: false
     },
     {
-      name: 'Synth 3',
+      name: SB,
       url: 'sounds/snare_light.mp3',
       buffer: null,
       length: 8,
       current: 1,
-      active: [],
+      active: [1],
       probability: {
         chance: 1,
         in: 1
@@ -170,12 +183,12 @@ var defaultState = {
       expanded: false
     },
     {
-      name: 'hi hat',
+      name: SC,
       url: 'sounds/hat.mp3',
       buffer: null,
       length: 8,
       current: 1,
-      active: [1, 3, 5, 7],
+      active: [1],
       probability: {
         chance: 1,
         in: 1
@@ -188,7 +201,7 @@ var defaultState = {
       expanded: false
     },
     {
-      name: 'ride',
+      name: S1,
       url: 'sounds/ride.mp3',
       buffer: null,
       length: 8,
@@ -206,12 +219,12 @@ var defaultState = {
       expanded: false
     },
     {
-      name: 'bass',
+      name: S2,
       url: 'sounds/crash.mp3',
       buffer: null,
       length: 8,
       current: 1,
-      active: [1],
+      active: [3,7],
       probability: {
         chance: 1,
         in: 4
@@ -268,7 +281,7 @@ window.webtime = function(){
 
 window.log = function(msg){
   // comment out to turn off logging
-  // console.log(msg)
+  console.log(msg)
 }
 
 export default {
@@ -398,10 +411,10 @@ export default {
 
     },
     futureTick() {
-      window.log(`futureTick this.meta.futureTickTime ${this.meta.futureTickTime}`)
+      // window.log(`futureTick this.meta.futureTickTime ${this.meta.futureTickTime}`)
       var noteLength = 60 / this.meta.bpm;
       this.meta.futureTickTime += 0.25 * noteLength;
-      window.log(`futureTick this.meta.futureTickTime ${this.meta.futureTickTime}`)
+      // window.log(`futureTick this.meta.futureTickTime ${this.meta.futureTickTime}`)
       this.sounds.forEach((sound) => {
         sound.current++;
         if (sound.current > sound.length) {
@@ -410,7 +423,7 @@ export default {
       });
     },
     scheduleNote() {
-      window.log('scheduleNote')
+      // window.log('scheduleNote')
       this.sounds.forEach((sound) => {
         sound.probable = this.probability(sound.probability);
       });
@@ -423,33 +436,66 @@ export default {
         return;
       }
 
-      window.log(WebMidi)
+      // if (!sound.probable) {
+      //   return;
+      // }
+
       var out1 = WebMidi.getOutputByName("littleBits KORG W5 MIDI OUT");
       var out2 = WebMidi.getOutputByName("Komplete Audio 6");
       var out3 = WebMidi.getOutputByName("IAC Driver Bus 1");
-      window.log(out1, out2, out3)
-      if(sound.name == 'littleBits Synth Kit' && !sound.muted){
-        window.log(sound)
-        out1.playNote("E4", 1, {duration: 100, velocity: 0.5});
+
+      if(sound.name == LB && !sound.muted){
+        var notes = ["E5", "G5", "D5", "A5", "G5", "E5", "G5", "D5"]
+        var note = notes[noteIndex]
+        noteIndex++
+        if(noteIndex > notes.length - 1)
+          noteIndex = 0
+        if(Math.random() < .1)
+          noteIndex = 0
+        window.log(`playing ${note} on ${LB}`)
+        // note = "E4" // uncomment to tune
+        out1.playNote(note, 1, {duration: 200, velocity: 1.0}); // use this for live
+        // out3.playNote(note, 1, {duration: 100, velocity: 1.0}); // testing only
       }
 
-      if(sound.name == 'Synth 2' && !sound.muted){
-        window.log(sound)
-        out2.playNote("E2", 1, {duration: 500, velocity: 0.5});
+      if(sound.name == SS && !sound.muted){
+        var note = _.sample(["E4", "G4", "A4", "B3", "B4", "E5"])
+        window.log(`playing ${note} on ${SS}`)
+        out3.playNote(note, 2, {duration: 1000, velocity: 1.0});
       }
 
-      if(sound.name == 'Synth 3' && !sound.muted){
-        window.log(sound)
-        out3.playNote(_.sample(["E3", "G3", "A3", "B3", "B2", "E4"]), 1, {duration: 100, velocity: 0.5});
+      if(sound.name == SB && !sound.muted){
+        var note = "E3"
+        window.log(`playing ${note} on ${SB}`)
+        out3.playNote(note,4, {duration: 1500, velocity: 0.8});
       }
-      // ignore mutes and all, just don't play sounds!
+
+      if(sound.name == SC && !sound.muted){
+        var note = _.sample(["E4", "A4", "E4"])
+        window.log(`playing ${note} on ${SC}`)
+        out3.playNote(note, 3, {duration: 500, velocity: 0.5});
+      }
+
+      if(sound.name == S1 && !sound.muted){
+        var notes = ["C2", "D2"]
+        var note = notes[drumIndex]
+        drumIndex++
+        if(drumIndex > notes.length - 1)
+          drumIndex = 0
+        window.log(`playing ${note} on ${S1}`)
+        out3.playNote(note, 5, {duration: 100, velocity: 0.5});
+      }
+
+      if(sound.name == S2 && !sound.muted){
+        var note = "C5"
+        window.log(`playing ${note} on ${S2}`)
+        out3.playNote(note, 6, {duration: 100, velocity: 0.5});
+      }
+
+      // ignore mutes and all, don't play sounds!
       return
 
       if (sound.muted) {
-        return;
-      }
-
-      if (!sound.probable) {
         return;
       }
 
@@ -483,14 +529,14 @@ export default {
 
     },
     scheduler() {
-      window.log(`this.meta.futureTickTime ${this.meta.futureTickTime} this.audioContext.currentTime ${this.audioContext.currentTime} webtime ${window.webtime()}`)
+      // window.log(`this.meta.futureTickTime ${this.meta.futureTickTime} this.audioContext.currentTime ${this.audioContext.currentTime} webtime ${window.webtime()}`)
       // while (this.meta.futureTickTime < this.audioContext.currentTime + 0.1) {
       while (this.meta.futureTickTime < window.webtime() + 0.1) {
         this.scheduleNote();
         this.futureTick();
-        window.log('sleeping')
+        // window.log('sleeping')
       }
-      window.t = window.setTimeout(this.scheduler, 50.0);
+      window.t = window.setTimeout(this.scheduler, SLEEP_TIMEOUT);
     },
     probability(ratio) {
       var set = [];
